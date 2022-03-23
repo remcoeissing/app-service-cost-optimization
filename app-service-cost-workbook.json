@@ -1,0 +1,193 @@
+{
+  "contentVersion": "1.0.0.0",
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "parameters": {
+    "workbookDisplayName": {
+      "type": "string",
+      "defaultValue": "App Service Plan - Cost optimization",
+      "metadata": {
+        "description": "The friendly name for the workbook that is used in the Gallery or Saved List.  This name must be unique within a resource group."
+      }
+    },
+    "workbookType": {
+      "type": "string",
+      "defaultValue": "workbook",
+      "metadata": {
+        "description": "The gallery that the workbook will been shown under. Supported values include workbook, tsg, etc. Usually, this is 'workbook'"
+      }
+    },
+    "workbookSourceId": {
+      "type": "string",
+      "metadata": {
+        "description": "The id of resource instance to which the workbook will be associated"
+      }
+    },
+    "workbookId": {
+      "type": "string",
+      "defaultValue": "[newGuid()]",
+      "metadata": {
+        "description": "The unique guid for this workbook instance"
+      }
+    }
+  },
+  "variables": {
+    "workbookContent": {
+      "version": "Notebook/1.0",
+      "items": [
+        {
+          "type": 9,
+          "content": {
+            "version": "KqlParameterItem/1.0",
+            "parameters": [
+              {
+                "id": "e2a6788d-4d6a-4c7c-bedf-b0612d22e285",
+                "version": "KqlParameterItem/1.0",
+                "name": "Subscription",
+                "type": 6,
+                "multiSelect": true,
+                "quote": "'",
+                "delimiter": ",",
+                "value": [
+                  "value::all"
+                ],
+                "typeSettings": {
+                  "additionalResourceOptions": [
+                    "value::all"
+                  ],
+                  "includeAll": false
+                },
+                "timeContext": {
+                  "durationMs": 86400000
+                }
+              }
+            ],
+            "style": "pills",
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces"
+          },
+          "name": "filter"
+        },
+        {
+          "type": 1,
+          "content": {
+            "json": "# Empty App Service Plans\r\n\r\nFor an App Service the billing is done on the App Service Plan. The App Service Plans below currently are not hosting any App Services. The billing will only stop when the App Service Plan is deleted.",
+            "style": "upsell"
+          },
+          "name": "appservice-plan-empty-description"
+        },
+        {
+          "type": 3,
+          "content": {
+            "version": "KqlItem/1.0",
+            "query": "resources\r\n| where type =~ 'Microsoft.Web/serverFarms'\r\n| where properties.numberOfSites == 0\r\n| project Name = id, ResourceGroup = resourceGroup, Sku = tostring(sku.size), Instances = tostring(properties.currentNumberOfWorkers)",
+            "size": 1,
+            "noDataMessage": "No empty App Service Plans",
+            "noDataMessageStyle": 3,
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources",
+            "crossComponentResources": [
+              "{Subscription}"
+            ]
+          },
+          "name": "appservice-plan-empty"
+        },
+        {
+          "type": 1,
+          "content": {
+            "json": "# Standard App Services to Premium recommendations\r\n\r\nThe below App Service Plans are using the Standard tier. By upgrading them to the Premium v2 tier you will get double the cores and memory for the same price. (https://azure.microsoft.com/en-us/pricing/details/app-service/windows/)",
+            "style": "upsell"
+          },
+          "name": "appservice-plan-standard-description"
+        },
+        {
+          "type": 3,
+          "content": {
+            "version": "KqlItem/1.0",
+            "query": "resources\r\n| where type =~ 'Microsoft.Web/serverFarms'\r\n| where sku.size == 'S2' or sku.size == 'S3' or sku.size == 'S1'\r\n| project Name = id, ResourceGroup = resourceGroup, Sku = tostring(sku.size), Instances = tostring(properties.currentNumberOfWorkers), RecommendedSku = iff(sku.size == 'S1', 'P1v2', iif(sku.size == 'S2', 'P1v2', 'P2v2'))",
+            "size": 0,
+            "noDataMessage": "No Standard App Serivce Plans that can be upgraded.",
+            "noDataMessageStyle": 3,
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources",
+            "crossComponentResources": [
+              "{Subscription}"
+            ]
+          },
+          "name": "appservice-plan-standard"
+        },
+        {
+          "type": 1,
+          "content": {
+            "json": "# Premium v1 App Services recommendations\r\n\r\nThe App Service Plans below are using the Premium (v1) tier. These can be replaced by Premium v2 plans, which are more cost effective.",
+            "style": "upsell"
+          },
+          "name": "appservice-plan-premium-description"
+        },
+        {
+          "type": 3,
+          "content": {
+            "version": "KqlItem/1.0",
+            "query": "resources\r\n| where type =~ 'Microsoft.Web/serverFarms'\r\n| where sku.size == 'P1' or sku.size == 'P2' or sku.size == 'P3'\r\n| project Name = id, ResourceGroup = resourceGroup, Sku = tostring(sku.size), Instances = tostring(properties.currentNumberOfWorkers), RecommendedSku = iff(sku.size == 'P1', 'P1v2', iif(sku.size == 'P2', 'P2v2', 'P3v2'))",
+            "size": 0,
+            "noDataMessage": "No Premium (v1) App Service Plans",
+            "noDataMessageStyle": 3,
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources",
+            "crossComponentResources": [
+              "{Subscription}"
+            ]
+          },
+          "name": "appservice-plan-premium"
+        },
+        {
+          "type": 1,
+          "content": {
+            "json": "# App Service Plans using Pv2 series\r\n\r\nThese App Service Plans are using the Premium v1 or Premium v2 tier. With Premium v3 they can leverage reservations. This would result in significant costs savings: https://azure.github.io/AppService/2021/03/11/increased-savings-with-app-service-offerings.html#reserved-instances-\r\n\r\nSwitching to this plan cannot be done on the same scale-unit.",
+            "style": "upsell"
+          },
+          "name": "appservice-plan-premiumv2-description"
+        },
+        {
+          "type": 3,
+          "content": {
+            "version": "KqlItem/1.0",
+            "query": "resources\r\n| where type =~ 'Microsoft.Web/serverFarms'\r\n| where sku.size startswith 'P' and sku.size endswith 'v2'\r\n| project Name = id, ResourceGroup = resourceGroup, Sku = tostring(sku.size), Instances = tostring(properties.currentNumberOfWorkers), RecommendedSku = iff(sku.size == 'P1v2', 'P1v3', iif(sku.size == 'P2v2', 'P1v3', 'P2v3'))",
+            "size": 0,
+            "noDataMessage": "No Premiumv2 App Serivce Plans to optimize",
+            "noDataMessageStyle": 3,
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources",
+            "crossComponentResources": [
+              "{Subscription}"
+            ]
+          },
+          "name": "appservice-plan-premiumv2"
+        }
+      ],
+      "isLocked": false
+    }
+  },
+  "resources": [
+    {
+      "name": "[parameters('workbookId')]",
+      "type": "microsoft.insights/workbooks",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2021-03-08",
+      "dependsOn": [],
+      "kind": "shared",
+      "properties": {
+        "displayName": "[parameters('workbookDisplayName')]",
+        "serializedData": "[string(variables('workbookContent'))]",
+        "version": "1.0",
+        "sourceId": "[parameters('workbookSourceId')]",
+        "category": "[parameters('workbookType')]"
+      }
+    }
+  ],
+  "outputs": {
+    "workbookId": {
+      "type": "string",
+      "value": "[resourceId( 'microsoft.insights/workbooks', parameters('workbookId'))]"
+    }
+  }
+}
