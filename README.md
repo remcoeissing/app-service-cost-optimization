@@ -1,4 +1,4 @@
-# App Serivce Cost Optimization
+# App Service Cost Optimization
 
 Many teams are leveraging App Services for hosting their sites, APIs etc..
 
